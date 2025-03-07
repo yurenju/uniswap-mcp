@@ -1,223 +1,326 @@
+#!/usr/bin/env node
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const NWS_API_BASE = "https://api.weather.gov";
-const USER_AGENT = "weather-app/1.0";
-
 // Create server instance
 const server = new McpServer({
-  name: "weather",
+  name: "uniswap",
   version: "1.0.0",
 });
 
-// Helper function for making NWS API requests
-async function makeNWSRequest<T>(url: string): Promise<T | null> {
-    const headers = {
-      "User-Agent": USER_AGENT,
-      Accept: "application/geo+json",
-    };
-  
+// Define token interface
+interface TokenInfo {
+  address: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+}
+
+// Mock data for token information
+const MOCK_TOKENS: Record<string, TokenInfo> = {
+  "OP": {
+    address: "0x4200000000000000000000000000000000000042",
+    name: "Optimism",
+    symbol: "OP",
+    decimals: 18
+  },
+  "USDC": {
+    address: "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
+    name: "USD Coin",
+    symbol: "USDC",
+    decimals: 6
+  },
+  "ETH": {
+    address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+    name: "Ethereum",
+    symbol: "ETH",
+    decimals: 18
+  },
+  "DAI": {
+    address: "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
+    name: "Dai Stablecoin",
+    symbol: "DAI",
+    decimals: 18
+  },
+  "WETH": {
+    address: "0x4200000000000000000000000000000000000006",
+    name: "Wrapped Ether",
+    symbol: "WETH",
+    decimals: 18
+  }
+};
+
+// Register token info tool
+server.tool(
+  "get-token-info",
+  "Get token information by symbol",
+  {
+    symbol: z.string().describe("Token symbol (e.g., OP, USDC)"),
+    chainId: z.number().optional().describe("Chain ID (defaults to Optimism's chain ID: 10)"),
+  },
+  async ({ symbol }) => {
     try {
-      const response = await fetch(url, { headers });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Convert symbol to uppercase for case-insensitive matching
+      const upperSymbol = symbol.toUpperCase();
+      
+      // Check if token exists in our mock data
+      if (!MOCK_TOKENS[upperSymbol]) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Token with symbol ${symbol} not found.`,
+            },
+          ],
+        };
       }
-      return (await response.json()) as T;
+
+      // Return token information
+      const token = MOCK_TOKENS[upperSymbol];
+      const responseText = `
+Token Information:
+Symbol: ${token.symbol}
+Name: ${token.name}
+Address: ${token.address}
+Decimals: ${token.decimals}
+Chain: Optimism (Chain ID: 10)
+      `.trim();
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: responseText,
+          },
+        ],
+      };
     } catch (error) {
-      console.error("Error making NWS request:", error);
-      return null;
+      console.error("Error in get-token-info:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Failed to retrieve token information. Please try again.",
+          },
+        ],
+      };
     }
   }
-  
-  interface AlertFeature {
-    properties: {
-      event?: string;
-      areaDesc?: string;
-      severity?: string;
-      status?: string;
-      headline?: string;
-    };
-  }
-  
-  // Format alert data
-  function formatAlert(feature: AlertFeature): string {
-    const props = feature.properties;
-    return [
-      `Event: ${props.event || "Unknown"}`,
-      `Area: ${props.areaDesc || "Unknown"}`,
-      `Severity: ${props.severity || "Unknown"}`,
-      `Status: ${props.status || "Unknown"}`,
-      `Headline: ${props.headline || "No headline"}`,
-      "---",
-    ].join("\n");
-  }
-  
-  interface ForecastPeriod {
-    name?: string;
-    temperature?: number;
-    temperatureUnit?: string;
-    windSpeed?: string;
-    windDirection?: string;
-    shortForecast?: string;
-  }
-  
-  interface AlertsResponse {
-    features: AlertFeature[];
-  }
-  
-  interface PointsResponse {
-    properties: {
-      forecast?: string;
-    };
-  }
-  
-  interface ForecastResponse {
-    properties: {
-      periods: ForecastPeriod[];
-    };
-  }
+);
 
-  // Register weather tools
+// Register quote tool
 server.tool(
-    "get-alerts",
-    "Get weather alerts for a state",
-    {
-      state: z.string().length(2).describe("Two-letter state code (e.g. CA, NY)"),
-    },
-    async ({ state }) => {
-      const stateCode = state.toUpperCase();
-      const alertsUrl = `${NWS_API_BASE}/alerts?area=${stateCode}`;
-      const alertsData = await makeNWSRequest<AlertsResponse>(alertsUrl);
-  
-      if (!alertsData) {
+  "get-quote",
+  "Get a quote for swapping tokens",
+  {
+    tokenInSymbol: z.string().describe("Input token symbol (e.g., ETH, USDC)"),
+    tokenOutSymbol: z.string().describe("Output token symbol (e.g., USDC, OP)"),
+    amountIn: z.number().positive().describe("Amount of input token"),
+    tokenIn: z.string().optional().describe("Input token address (optional if tokenInSymbol is provided)"),
+    tokenOut: z.string().optional().describe("Output token address (optional if tokenOutSymbol is provided)"),
+    decimalsIn: z.number().optional().describe("Input token decimals (optional, defaults to auto-detect)"),
+    decimalsOut: z.number().optional().describe("Output token decimals (optional, defaults to auto-detect)"),
+  },
+  async ({ tokenInSymbol, tokenOutSymbol, amountIn }) => {
+    try {
+      // Convert symbols to uppercase for case-insensitive matching
+      const upperTokenInSymbol = tokenInSymbol.toUpperCase();
+      const upperTokenOutSymbol = tokenOutSymbol.toUpperCase();
+      
+      // Check if tokens exist in our mock data
+      if (!MOCK_TOKENS[upperTokenInSymbol] || !MOCK_TOKENS[upperTokenOutSymbol]) {
         return {
           content: [
             {
               type: "text",
-              text: "Failed to retrieve alerts data",
+              text: `One or both tokens (${tokenInSymbol}, ${tokenOutSymbol}) not found.`,
             },
           ],
         };
       }
-  
-      const features = alertsData.features || [];
-      if (features.length === 0) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `No active alerts for ${stateCode}`,
-            },
-          ],
-        };
-      }
-  
-      const formattedAlerts = features.map(formatAlert);
-      const alertsText = `Active alerts for ${stateCode}:\n\n${formattedAlerts.join("\n")}`;
-  
-      return {
-        content: [
-          {
-            type: "text",
-            text: alertsText,
-          },
-        ],
-      };
-    },
-  );
-  
-  server.tool(
-    "get-forecast",
-    "Get weather forecast for a location",
-    {
-      latitude: z.number().min(-90).max(90).describe("Latitude of the location"),
-      longitude: z.number().min(-180).max(180).describe("Longitude of the location"),
-    },
-    async ({ latitude, longitude }) => {
-      // Get grid point data
-      const pointsUrl = `${NWS_API_BASE}/points/${latitude.toFixed(4)},${longitude.toFixed(4)}`;
-      const pointsData = await makeNWSRequest<PointsResponse>(pointsUrl);
-  
-      if (!pointsData) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Failed to retrieve grid point data for coordinates: ${latitude}, ${longitude}. This location may not be supported by the NWS API (only US locations are supported).`,
-            },
-          ],
-        };
-      }
-  
-      const forecastUrl = pointsData.properties?.forecast;
-      if (!forecastUrl) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to get forecast URL from grid point data",
-            },
-          ],
-        };
-      }
-  
-      // Get forecast data
-      const forecastData = await makeNWSRequest<ForecastResponse>(forecastUrl);
-      if (!forecastData) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to retrieve forecast data",
-            },
-          ],
-        };
-      }
-  
-      const periods = forecastData.properties?.periods || [];
-      if (periods.length === 0) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "No forecast periods available",
-            },
-          ],
-        };
-      }
-  
-      // Format forecast periods
-      const formattedForecast = periods.map((period: ForecastPeriod) =>
-        [
-          `${period.name || "Unknown"}:`,
-          `Temperature: ${period.temperature || "Unknown"}°${period.temperatureUnit || "F"}`,
-          `Wind: ${period.windSpeed || "Unknown"} ${period.windDirection || ""}`,
-          `${period.shortForecast || "No forecast available"}`,
-          "---",
-        ].join("\n"),
-      );
-  
-      const forecastText = `Forecast for ${latitude}, ${longitude}:\n\n${formattedForecast.join("\n")}`;
-  
-      return {
-        content: [
-          {
-            type: "text",
-            text: forecastText,
-          },
-        ],
-      };
-    },
-  );
 
-  async function main() {
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error("Weather MCP Server running on stdio");
+      // Mock price data (in a real implementation, this would come from Uniswap)
+      const mockPrices: Record<string, number> = {
+        "ETH_USDC": 3500,
+        "USDC_ETH": 1 / 3500,
+        "OP_USDC": 2.5,
+        "USDC_OP": 1 / 2.5,
+        "ETH_OP": 3500 / 2.5,
+        "OP_ETH": 2.5 / 3500,
+        "DAI_USDC": 0.99,
+        "USDC_DAI": 1 / 0.99,
+        "ETH_DAI": 3500 * 0.99,
+        "DAI_ETH": 1 / (3500 * 0.99),
+        "OP_DAI": 2.5 * 0.99,
+        "DAI_OP": 1 / (2.5 * 0.99),
+        "WETH_ETH": 1,
+        "ETH_WETH": 1,
+        "WETH_USDC": 3500,
+        "USDC_WETH": 1 / 3500,
+      };
+
+      const pricePair = `${upperTokenInSymbol}_${upperTokenOutSymbol}`;
+      const price = mockPrices[pricePair] || 1; // Default to 1:1 if pair not found
+      
+      // Calculate output amount
+      const amountOut = amountIn * price;
+      
+      // Add some mock price impact and fee
+      const priceImpact = 0.5; // 0.5%
+      const fee = 0.3; // 0.3%
+      
+      // Calculate final amount with price impact and fee
+      const finalAmountOut = amountOut * (1 - priceImpact / 100 - fee / 100);
+
+      // Format response
+      const responseText = `
+Quote Information:
+Input: ${amountIn} ${MOCK_TOKENS[upperTokenInSymbol].symbol}
+Output: ${finalAmountOut.toFixed(6)} ${MOCK_TOKENS[upperTokenOutSymbol].symbol}
+Exchange Rate: 1 ${MOCK_TOKENS[upperTokenInSymbol].symbol} = ${price.toFixed(6)} ${MOCK_TOKENS[upperTokenOutSymbol].symbol}
+Price Impact: ${priceImpact}%
+Fee: ${fee}%
+      `.trim();
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: responseText,
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Error in get-quote:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Failed to retrieve quote. Please try again.",
+          },
+        ],
+      };
+    }
   }
-  
-  main().catch((error) => {
-    console.error("Fatal error in main():", error);
-    process.exit(1);
-  });
+);
+
+// Register swap tokens tool
+server.tool(
+  "swap-tokens",
+  "Swap tokens on Uniswap",
+  {
+    tokenInSymbol: z.string().describe("Input token symbol (e.g., ETH, USDC)"),
+    tokenOutSymbol: z.string().describe("Output token symbol (e.g., USDC, OP)"),
+    amountIn: z.number().positive().describe("Amount of input token"),
+    tokenIn: z.string().optional().describe("Input token address (optional if tokenInSymbol is provided)"),
+    tokenOut: z.string().optional().describe("Output token address (optional if tokenOutSymbol is provided)"),
+    slippageTolerance: z.number().optional().default(0.5).describe("Slippage tolerance in percentage (default: 0.5%)"),
+    recipient: z.string().optional().describe("Recipient address (optional, defaults to sender)"),
+    deadline: z.number().optional().describe("Transaction deadline in minutes (optional, defaults to 20 minutes)"),
+  },
+  async ({ tokenInSymbol, tokenOutSymbol, amountIn, slippageTolerance = 0.5 }) => {
+    try {
+      // Convert symbols to uppercase for case-insensitive matching
+      const upperTokenInSymbol = tokenInSymbol.toUpperCase();
+      const upperTokenOutSymbol = tokenOutSymbol.toUpperCase();
+      
+      // Check if tokens exist in our mock data
+      if (!MOCK_TOKENS[upperTokenInSymbol] || !MOCK_TOKENS[upperTokenOutSymbol]) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `One or both tokens (${tokenInSymbol}, ${tokenOutSymbol}) not found.`,
+            },
+          ],
+        };
+      }
+
+      // Mock price data (same as in get-quote)
+      const mockPrices: Record<string, number> = {
+        "ETH_USDC": 3500,
+        "USDC_ETH": 1 / 3500,
+        "OP_USDC": 2.5,
+        "USDC_OP": 1 / 2.5,
+        "ETH_OP": 3500 / 2.5,
+        "OP_ETH": 2.5 / 3500,
+        "DAI_USDC": 0.99,
+        "USDC_DAI": 1 / 0.99,
+        "ETH_DAI": 3500 * 0.99,
+        "DAI_ETH": 1 / (3500 * 0.99),
+        "OP_DAI": 2.5 * 0.99,
+        "DAI_OP": 1 / (2.5 * 0.99),
+        "WETH_ETH": 1,
+        "ETH_WETH": 1,
+        "WETH_USDC": 3500,
+        "USDC_WETH": 1 / 3500,
+      };
+
+      const pricePair = `${upperTokenInSymbol}_${upperTokenOutSymbol}`;
+      const price = mockPrices[pricePair] || 1; // Default to 1:1 if pair not found
+      
+      // Calculate output amount
+      const amountOut = amountIn * price;
+      
+      // Add some mock price impact and fee
+      const priceImpact = 0.5; // 0.5%
+      const fee = 0.3; // 0.3%
+      
+      // Calculate final amount with price impact and fee
+      const finalAmountOut = amountOut * (1 - priceImpact / 100 - fee / 100);
+
+      // Generate a mock transaction hash
+      const mockTxHash = "0x" + Array.from({ length: 64 }, () => 
+        Math.floor(Math.random() * 16).toString(16)).join('');
+
+      // Format response
+      const responseText = `
+Swap Executed Successfully!
+
+Transaction Details:
+Input: ${amountIn} ${MOCK_TOKENS[upperTokenInSymbol].symbol}
+Output: ${finalAmountOut.toFixed(6)} ${MOCK_TOKENS[upperTokenOutSymbol].symbol}
+Exchange Rate: 1 ${MOCK_TOKENS[upperTokenInSymbol].symbol} = ${price.toFixed(6)} ${MOCK_TOKENS[upperTokenOutSymbol].symbol}
+Slippage Tolerance: ${slippageTolerance}%
+Price Impact: ${priceImpact}%
+Fee: ${fee}%
+Transaction Hash: ${mockTxHash}
+Network: Optimism
+
+Note: This is a mock transaction. In a real implementation, this would execute an actual swap on Uniswap.
+      `.trim();
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: responseText,
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Error in swap-tokens:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Failed to execute swap. Please try again.",
+          },
+        ],
+      };
+    }
+  }
+);
+
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("Uniswap MCP Server running on stdio");
+}
+
+main().catch((error) => {
+  console.error("Fatal error in main():", error);
+  process.exit(1);
+});
