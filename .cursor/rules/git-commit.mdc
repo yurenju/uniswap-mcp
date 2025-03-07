@@ -1,0 +1,7 @@
+---
+description: When making a git commit or modifying a commit message, follow this rule.
+globs: 
+alwaysApply: false
+---
+
+Please reference [CONTRIBUTING.md](mdc:CONTRIBUTING.md)
