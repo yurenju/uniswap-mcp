@@ -1,0 +1,6 @@
+---
+description: When adding new files or updating file content, please follow this rule.
+globs: 
+alwaysApply: false
+---
+Please refer to the "Language Guidelines" section in the [CONTRIBUTING.md](mdc:CONTRIBUTING.md) file.
