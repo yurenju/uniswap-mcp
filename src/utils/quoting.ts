@@ -5,10 +5,10 @@
 
 import * as protocolink from './protocolink.js';
 
-// USDC 代幣地址 (Optimism)
+// USDC token address (Optimism)
 const USDC_ADDRESS = '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85';
 
-// 定義報價結果的介面
+// Define the interface for quote results
 export interface QuoteResult {
   tokenIn: {
     address: string;
@@ -32,11 +32,11 @@ export interface QuoteResult {
 }
 
 /**
- * 獲取代幣報價，預設使用 USDC 作為支付代幣
- * @param tokenSymbol 想要購買的代幣符號
- * @param amountIn USDC 的輸入金額
- * @param slippage 滑點容忍度 (百分比，預設 0.5%)
- * @param useUSDC 是否使用 USDC 作為支付代幣 (預設為 true)
+ * Get token quote, using USDC as the payment token by default
+ * @param tokenSymbol Symbol of the token to buy
+ * @param amountIn Amount of USDC to input
+ * @param slippage Slippage tolerance (percentage, default 0.5%)
+ * @param useUSDC Whether to use USDC as the payment token (default true)
  */
 export async function getQuote(
   tokenSymbol: string,
@@ -47,7 +47,7 @@ export async function getQuote(
   try {
     console.log(`Getting quote for ${useUSDC ? 'buying' : 'selling'} ${tokenSymbol}...`);
     
-    // 1. 獲取目標代幣資訊
+    // 1. Get target token information
     const targetTokens = await protocolink.getTokensBySymbol(tokenSymbol);
     
     if (targetTokens.length === 0) {
@@ -56,12 +56,12 @@ export async function getQuote(
     
     const targetToken = targetTokens[0];
     
-    // 2. 獲取 USDC 代幣資訊
+    // 2. Get USDC token information
     let usdcToken;
-    if (useUSDC || !useUSDC) { // 無論是買入還是賣出，都需要 USDC 資訊
+    if (useUSDC || !useUSDC) { // Need USDC info for both buying and selling
       const usdcTokens = await protocolink.getTokensBySymbol('USDC');
       if (usdcTokens.length === 0) {
-        // 如果找不到 USDC，嘗試直接使用地址
+        // If USDC not found, try using the address directly
         const token = await protocolink.getTokenByAddress(USDC_ADDRESS);
         if (!token) {
           throw new Error('USDC token not found');
@@ -72,16 +72,16 @@ export async function getQuote(
       }
     }
     
-    // 確保 usdcToken 已定義
+    // Ensure usdcToken is defined
     if (!usdcToken) {
       throw new Error('USDC token not found');
     }
     
-    // 3. 使用 Protocolink API 獲取實際報價
+    // 3. Get actual quote using Protocolink API
     const fromToken = useUSDC ? usdcToken : targetToken;
     const toToken = useUSDC ? targetToken : usdcToken;
     
-    // 使用 Protocolink API 獲取報價
+    // Get quotation using Protocolink API
     const quotation = await protocolink.getQuotation({
       fromToken,
       toToken,
@@ -89,7 +89,7 @@ export async function getQuote(
       slippage
     });
     
-    // 4. 返回格式化的報價資訊
+    // 4. Return formatted quote information
     return {
       tokenIn: fromToken,
       tokenOut: toToken,
@@ -106,16 +106,16 @@ export async function getQuote(
 }
 
 /**
- * 獲取代幣賣出報價，將代幣賣出換成 USDC
- * @param tokenSymbol 想要賣出的代幣符號
- * @param amountIn 賣出的代幣金額
- * @param slippage 滑點容忍度 (百分比，預設 0.5%)
+ * Get token sell quote, selling token for USDC
+ * @param tokenSymbol Symbol of the token to sell
+ * @param amountIn Amount of token to sell
+ * @param slippage Slippage tolerance (percentage, default 0.5%)
  */
 export async function getSellQuote(
   tokenSymbol: string,
   amountIn: string,
   slippage: number = 0.5
 ): Promise<QuoteResult> {
-  // 賣出代幣時，將 useUSDC 設為 false，並交換輸入/輸出代幣
+  // When selling tokens, set useUSDC to false and swap input/output tokens
   return getQuote(tokenSymbol, amountIn, slippage, false);
 } 

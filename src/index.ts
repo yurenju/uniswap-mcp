@@ -285,17 +285,32 @@ server.tool(
         recipient
       });
       
-      // Format response
+      // Check if the result is an error
+      if ('isError' in swapResult && swapResult.isError) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to execute swap: ${swapResult.message}`,
+            },
+          ],
+        };
+      }
+      
+      // At this point, swapResult must be a SwapResult
+      const successResult = swapResult as swapping.SwapResult;
+      
+      // Format response for successful swap
       const responseText = `
 Swap Executed Successfully!
 
 Transaction Details:
-Input: ${swapResult.fromToken.amount} ${swapResult.fromToken.symbol}
-Output: ${swapResult.toToken.amount} ${swapResult.toToken.symbol}
-Exchange Rate: ${swapResult.exchangeRate}
+Input: ${successResult.fromToken.amount} ${successResult.fromToken.symbol}
+Output: ${successResult.toToken.amount} ${successResult.toToken.symbol}
+Exchange Rate: ${successResult.exchangeRate}
 Slippage Tolerance: ${slippageTolerance}%
-Fee: ${swapResult.fee}%
-Transaction Hash: ${swapResult.transactionHash}
+Fee: ${successResult.fee}%
+Transaction Hash: ${successResult.transactionHash}
 Network: Optimism
       `.trim();
 
