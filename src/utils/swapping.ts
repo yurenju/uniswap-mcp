@@ -33,6 +33,15 @@ export interface SwapResult {
 }
 
 /**
+ * Error result interface for MCP compatibility
+ */
+export interface ErrorResult {
+  isError: true;
+  message: string;
+  details?: any;
+}
+
+/**
  * Execute token swap using Protocolink SDK
  */
 export async function swapTokens(params: {
@@ -41,7 +50,7 @@ export async function swapTokens(params: {
   amount: string;
   slippage: number;
   recipient?: string;
-}): Promise<SwapResult> {
+}): Promise<SwapResult | ErrorResult> {
   try {
     const { fromTokenSymbol, toTokenSymbol, amount, slippage, recipient } = params;
     
@@ -50,7 +59,10 @@ export async function swapTokens(params: {
     const toTokens = await protocolink.getTokensBySymbol(toTokenSymbol);
     
     if (fromTokens.length === 0 || toTokens.length === 0) {
-      throw new Error(`One or both tokens not found: ${fromTokenSymbol}, ${toTokenSymbol}`);
+      return {
+        isError: true,
+        message: `One or both tokens not found: ${fromTokenSymbol}, ${toTokenSymbol}`
+      };
     }
     
     const fromToken = fromTokens[0];
@@ -161,7 +173,11 @@ export async function swapTokens(params: {
     console.log(`Transaction confirmed! Status: ${receipt.status}`);
     
     if (receipt.status !== 'success') {
-      throw new Error('Transaction failed');
+      return {
+        isError: true,
+        message: 'Transaction failed',
+        details: receipt
+      };
     }
     
     // Calculate exchange rate
@@ -188,10 +204,19 @@ export async function swapTokens(params: {
   } catch (error: unknown) {
     console.error('Error swapping tokens:', error);
     
+    // Return structured error information
     if (error instanceof Error) {
-      throw new Error(`Failed to swap tokens: ${error.message}`);
+      return {
+        isError: true,
+        message: `Failed to swap tokens: ${error.message}`,
+        details: error
+      };
     } else {
-      throw new Error('Failed to swap tokens: Unknown error');
+      return {
+        isError: true,
+        message: 'Failed to swap tokens: Unknown error',
+        details: error
+      };
     }
   }
 } 

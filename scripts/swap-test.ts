@@ -59,6 +59,15 @@ async function main() {
       slippage,
     });
     
+    // Check if there was an error
+    if ('isError' in firstSwapResult) {
+      console.error('Error executing swap:', firstSwapResult.message);
+      if (firstSwapResult.details) {
+        console.error('Details:', firstSwapResult.details);
+      }
+      process.exit(1);
+    }
+    
     // Display first swap result
     console.log('\nFirst Swap Executed Successfully!');
     console.log('\nTransaction Details:');
@@ -81,6 +90,15 @@ async function main() {
         amount: firstSwapResult.toToken.amount,
         slippage,
       });
+      
+      // Check if there was an error
+      if ('isError' in secondSwapResult) {
+        console.error('Error executing return swap:', secondSwapResult.message);
+        if (secondSwapResult.details) {
+          console.error('Details:', secondSwapResult.details);
+        }
+        process.exit(1);
+      }
       
       // Display second swap result
       console.log('\nSecond Swap Executed Successfully!');
@@ -109,7 +127,7 @@ async function main() {
     }
     
   } catch (error) {
-    console.error('Error executing swap:', error);
+    console.error('Error in swap-test script:', error);
     process.exit(1);
   }
 }
