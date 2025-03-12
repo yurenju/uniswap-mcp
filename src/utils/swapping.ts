@@ -110,7 +110,7 @@ export async function swapTokens(params: {
     console.log('Building swap transaction...');
     const swapLogic = api.protocols.uniswapv3.newSwapTokenLogic(swapQuotation);
     
-    // Create router data
+    // Create router data with recipient
     const routerData = {
       chainId: CHAIN_ID,
       account: walletConfig.address,
@@ -119,7 +119,9 @@ export async function swapTokens(params: {
     
     // Estimate router data to check for approvals
     console.log('Estimating transaction...');
-    const estimateResult = await api.estimateRouterData(routerData);
+    const estimateResult = await api.estimateRouterData(routerData, {
+      permit2Type: 'approve' // Use approve instead of permit for better compatibility
+    });
     
     // Check if approvals are needed
     if (estimateResult.approvals && estimateResult.approvals.length > 0) {
