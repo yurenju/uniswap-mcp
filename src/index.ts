@@ -3,6 +3,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import * as protocolink from "./utils/protocolink.js";
 
 // Create server instance
 const server = new McpServer({
@@ -52,6 +53,38 @@ const MOCK_TOKENS: Record<string, TokenInfo> = {
   }
 };
 
+/**
+ * Get token information by symbol, using Protocolink
+ * @param symbol Token symbol to look up
+ * @returns Token information or null if not found
+ */
+async function getTokenInfo(symbol: string): Promise<TokenInfo | null> {
+  try {
+    // Get tokens from Protocolink
+    const tokens = await protocolink.getTokensBySymbol(symbol);
+    
+    // If tokens found, return the first one
+    if (tokens.length > 0) {
+      return tokens[0];
+    }
+    
+    // If not found in Protocolink, try mock data as fallback
+    const upperSymbol = symbol.toUpperCase();
+    if (MOCK_TOKENS[upperSymbol]) {
+      return MOCK_TOKENS[upperSymbol];
+    }
+    
+    // If still not found, return null
+    return null;
+  } catch (error) {
+    console.error('Error getting token info:', error);
+    
+    // If there's an error, fall back to mock data
+    const upperSymbol = symbol.toUpperCase();
+    return MOCK_TOKENS[upperSymbol] || null;
+  }
+}
+
 // Register token info tool
 server.tool(
   "get-token-info",
@@ -65,8 +98,11 @@ server.tool(
       // Convert symbol to uppercase for case-insensitive matching
       const upperSymbol = symbol.toUpperCase();
       
-      // Check if token exists in our mock data
-      if (!MOCK_TOKENS[upperSymbol]) {
+      // Get token info
+      const token = await getTokenInfo(upperSymbol);
+      
+      // Check if token exists
+      if (!token) {
         return {
           content: [
             {
@@ -78,7 +114,6 @@ server.tool(
       }
 
       // Return token information
-      const token = MOCK_TOKENS[upperSymbol];
       const responseText = `
 Token Information:
 Symbol: ${token.symbol}

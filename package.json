@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\""
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "token-info": "tsx scripts/token-info.ts"
   },
   "files": [
     "build"
@@ -17,12 +18,15 @@
   "description": "",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.6.1",
+    "@protocolink/api": "^1.4.8",
     "@uniswap/sdk-core": "7.7.2",
     "@uniswap/v3-sdk": "3.25.2",
+    "dotenv": "^16.4.7",
     "zod": "3.24.2"
   },
   "devDependencies": {
     "@types/node": "22.13.9",
+    "tsx": "^4.7.1",
     "typescript": "5.8.2"
   }
 }

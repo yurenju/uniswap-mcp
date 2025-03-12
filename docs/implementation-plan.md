@@ -247,7 +247,7 @@ Uniswap SDK 本身並不強制要求使用 ethers，它只需要一個符合 EIP
 
 ### 具體實施步驟
 
-1. **基礎框架搭建與 Mock 功能實現**
+1. ✅ ** 基礎框架搭建與 Mock 功能實現**
    - 修改 src/index.ts，移除天氣相關功能
    - 添加 Uniswap MCP 的基本框架
    - 實現 mock 版本的三個主要功能（get-token-info, get-quote, swap-tokens）
