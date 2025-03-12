@@ -45,7 +45,7 @@ export async function getQuote(
   useUSDC: boolean = true
 ): Promise<QuoteResult> {
   try {
-    console.log(`Getting quote for ${useUSDC ? 'buying' : 'selling'} ${tokenSymbol}...`);
+    console.error(`Getting quote for ${useUSDC ? 'buying' : 'selling'} ${tokenSymbol}...`);
     
     // 1. Get target token information
     const targetTokens = await protocolink.getTokensBySymbol(tokenSymbol);

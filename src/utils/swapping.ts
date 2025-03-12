@@ -75,7 +75,7 @@ export async function swapTokens(params: {
     const recipientAddress = getRecipientAddress(recipient);
     
     // Get quotation from Protocolink
-    console.log(`Getting quotation for ${amount} ${fromToken.symbol} to ${toToken.symbol}...`);
+    console.error(`Getting quotation for ${amount} ${fromToken.symbol} to ${toToken.symbol}...`);
     
     // Prepare input token for Protocolink
     const inputToken = {
@@ -104,10 +104,10 @@ export async function swapTokens(params: {
       slippage: slippage * 100 // Protocolink uses basis points (1% = 100)
     });
     
-    console.log(`Quotation received. Expected output: ${swapQuotation.output.amount} ${toToken.symbol}`);
+    console.error(`Quotation received. Expected output: ${swapQuotation.output.amount} ${toToken.symbol}`);
     
     // Create swap logic according to docs
-    console.log('Building swap transaction...');
+    console.error('Building swap transaction...');
     const swapLogic = api.protocols.uniswapv3.newSwapTokenLogic(swapQuotation);
     
     // Create router data with recipient
@@ -118,17 +118,17 @@ export async function swapTokens(params: {
     };
     
     // Estimate router data to check for approvals
-    console.log('Estimating transaction...');
+    console.error('Estimating transaction...');
     const estimateResult = await api.estimateRouterData(routerData, {
       permit2Type: 'approve' // Use approve instead of permit for better compatibility
     });
     
     // Check if approvals are needed
     if (estimateResult.approvals && estimateResult.approvals.length > 0) {
-      console.log(`${estimateResult.approvals.length} approval(s) needed. Executing approvals...`);
+      console.error(`${estimateResult.approvals.length} approval(s) needed. Executing approvals...`);
       
       for (const approval of estimateResult.approvals) {
-        console.log(`Approving token for spending...`);
+        console.error(`Approving token for spending...`);
         
         // Send approval transaction
         const approvalTx = await walletConfig.walletClient.sendTransaction({
@@ -138,25 +138,25 @@ export async function swapTokens(params: {
           value: BigInt(0)
         });
         
-        console.log(`Approval transaction sent: ${approvalTx}`);
+        console.error(`Approval transaction sent: ${approvalTx}`);
         
         // Wait for approval transaction to be confirmed
         const approvalReceipt = await walletConfig.publicClient.waitForTransactionReceipt({
           hash: approvalTx
         });
         
-        console.log(`Approval confirmed: ${approvalReceipt.status}`);
+        console.error(`Approval confirmed: ${approvalReceipt.status}`);
       }
     } else {
-      console.log('No approvals needed.');
+      console.error('No approvals needed.');
     }
     
     // Build the transaction request
-    console.log('Building transaction request...');
+    console.error('Building transaction request...');
     const request = await api.buildRouterTransactionRequest(routerData);
     
     // Send the transaction
-    console.log('Sending transaction...');
+    console.error('Sending transaction...');
     const hash = await walletConfig.walletClient.sendTransaction({
       account: walletConfig.walletClient.account,
       to: request.to as `0x${string}`,
@@ -164,15 +164,15 @@ export async function swapTokens(params: {
       value: BigInt(String(request.value || '0'))
     });
     
-    console.log(`Transaction sent! Hash: ${hash}`);
+    console.error(`Transaction sent! Hash: ${hash}`);
     
     // Wait for transaction receipt
-    console.log('Waiting for transaction confirmation...');
+    console.error('Waiting for transaction confirmation...');
     const receipt = await walletConfig.publicClient.waitForTransactionReceipt({ 
       hash: hash 
     });
     
-    console.log(`Transaction confirmed! Status: ${receipt.status}`);
+    console.error(`Transaction confirmed! Status: ${receipt.status}`);
     
     if (receipt.status !== 'success') {
       return {

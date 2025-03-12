@@ -81,9 +81,7 @@ async function getTokenInfo(symbol: string): Promise<TokenInfo | null> {
     // If still not found, return null
     return null;
   } catch (error) {
-    console.error('Error getting token info:', error);
-    
-    // If there's an error, fall back to mock data
+    // Silently handle error and fall back to mock data
     const upperSymbol = symbol.toUpperCase();
     return MOCK_TOKENS[upperSymbol] || null;
   }
@@ -136,7 +134,6 @@ Chain: Optimism (Chain ID: 10)
         ],
       };
     } catch (error) {
-      console.error("Error in get-token-info:", error);
       return {
         content: [
           {
@@ -185,7 +182,6 @@ Fee: ${quote.fee}%
         ],
       };
     } catch (error) {
-      console.error("Error in get-quote:", error);
       return {
         content: [
           {
@@ -233,7 +229,6 @@ Fee: ${quote.fee}%
         ],
       };
     } catch (error) {
-      console.error("Error in sell-quote:", error);
       return {
         content: [
           {
@@ -325,7 +320,6 @@ Network: Optimism
         ],
       };
     } catch (error) {
-      console.error("Error in swap-tokens:", error);
       return {
         content: [
           {
@@ -348,7 +342,6 @@ server.tool(
   },
   async ({ address, includeBalances = true }) => {
     try {
-      
       // Get wallet address (from parameter or config)
       let walletAddress = address;
       if (!walletAddress) {
@@ -389,12 +382,10 @@ Network: Optimism (Chain ID: 10)
         content: [{ type: "text", text: responseText }],
       };
     } catch (error) {
-      console.error("Error in get-wallet-info:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         content: [{ 
           type: "text", 
-          text: `Failed to retrieve wallet information. Error details:\n${errorMessage}\n\nPlease check your configuration.` 
+          text: `Failed to retrieve wallet information. Please check your configuration.` 
         }],
       };
     }
