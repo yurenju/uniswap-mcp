@@ -1,12 +1,14 @@
 {
   "name": "uniswap-mcp",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
     "token-info": "tsx scripts/token-info.ts",
     "quote-info": "tsx scripts/quote-info.ts",
     "swap-test": "tsx scripts/swap-test.ts",
+    "wallet-info": "tsx scripts/get-wallet-info.ts",
     "generate-wallet": "tsx scripts/generate-wallet.ts"
   },
   "files": [
@@ -21,10 +23,12 @@
   "description": "",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.6.1",
+    "@moralisweb3/common-evm-utils": "^2.27.2",
     "@protocolink/api": "^1.4.8",
     "@uniswap/sdk-core": "7.7.2",
     "@uniswap/v3-sdk": "3.25.2",
     "dotenv": "^16.4.7",
+    "moralis": "^2.27.2",
     "viem": "^2.23.10",
     "zod": "3.24.2"
   },

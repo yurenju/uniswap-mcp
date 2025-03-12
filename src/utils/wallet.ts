@@ -7,9 +7,20 @@ import { createPublicClient, createWalletClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { optimism } from 'viem/chains';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import fs from 'fs';
 
-// Load environment variables
-dotenv.config();
+// Get the directory path of the current module
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.join(currentDir, '..', '..');  // Go up to project root from src/utils
+
+// Try to find .env file
+const envPath = path.join(projectRoot, '.env');
+
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+} 
 
 // Hardcoded configuration values
 export const OPTIMISM_RPC_URL = 'https://mainnet.optimism.io';

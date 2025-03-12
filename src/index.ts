@@ -6,6 +6,8 @@ import { z } from "zod";
 import * as protocolink from "./utils/protocolink.js";
 import * as quoting from "./utils/quoting.js";
 import * as swapping from "./utils/swapping.js";
+import { loadWalletConfig } from "./utils/wallet.js";
+import { getWalletTokens } from "./utils/moralis.js";
 
 // Create server instance
 const server = new McpServer({
@@ -331,6 +333,69 @@ Network: Optimism
             text: "Failed to execute swap. Please try again.",
           },
         ],
+      };
+    }
+  }
+);
+
+// Register wallet info tool
+server.tool(
+  "get-wallet-info",
+  "Get wallet information including all token balances",
+  {
+    address: z.string().optional().describe("Wallet address (optional, uses configured wallet if not provided)"),
+    includeBalances: z.boolean().optional().default(true).describe("Whether to include token balances (default: true)"),
+  },
+  async ({ address, includeBalances = true }) => {
+    try {
+      
+      // Get wallet address (from parameter or config)
+      let walletAddress = address;
+      if (!walletAddress) {
+        const walletConfig = loadWalletConfig();
+        walletAddress = walletConfig.address;
+      }
+      
+      // Basic wallet info
+      let responseText = `
+Wallet Information:
+Address: ${walletAddress}
+Network: Optimism (Chain ID: 10)
+      `.trim();
+      
+      // Add token balances if requested
+      if (includeBalances) {
+        const tokens = await getWalletTokens(walletAddress);
+        
+        if ('error' in tokens) {
+          return {
+            content: [{ type: "text", text: `${responseText}\n\nError: ${tokens.error}` }],
+          };
+        }
+        
+        responseText += "\n\nToken Balances:";
+        
+        if (tokens.length === 0) {
+          responseText += "\nNo tokens found for this wallet.";
+        } else {
+          tokens.forEach((token: any) => {
+            const formattedBalance = parseFloat(token.balance) / Math.pow(10, token.decimals);
+            responseText += `\n${token.symbol}: ${formattedBalance.toFixed(4)} (${token.name})`;
+          });
+        }
+      }
+      
+      return {
+        content: [{ type: "text", text: responseText }],
+      };
+    } catch (error) {
+      console.error("Error in get-wallet-info:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ 
+          type: "text", 
+          text: `Failed to retrieve wallet information. Error details:\n${errorMessage}\n\nPlease check your configuration.` 
+        }],
       };
     }
   }
