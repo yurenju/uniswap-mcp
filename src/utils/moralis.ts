@@ -22,12 +22,30 @@ export async function getWalletTokens(address: string) {
   try {
     await initMoralis();
     
-    const response = await Moralis.EvmApi.token.getWalletTokenBalances({
+    // Get ERC20 token balances
+    const tokenResponse = await Moralis.EvmApi.token.getWalletTokenBalances({
       address,
       chain: OPTIMISM_CHAIN,
     });
+
+    // Get native token balance
+    const nativeBalanceResponse = await Moralis.EvmApi.balance.getNativeBalance({
+      address,
+      chain: OPTIMISM_CHAIN,
+    });
+
+    // Add native token to the response
+    const nativeToken = {
+      token_address: "0x0000000000000000000000000000000000000000", // ETH address
+      name: "Ethereum",
+      symbol: "ETH",
+      logo: null,
+      thumbnail: null,
+      decimals: 18,
+      balance: nativeBalanceResponse.raw.balance,
+    };
     
-    return response.raw;
+    return [nativeToken, ...tokenResponse.raw];
   } catch (error) {
     console.error('Error fetching wallet tokens:', error);
     return { error: 'Failed to fetch wallet tokens' };
