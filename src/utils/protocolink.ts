@@ -17,6 +17,16 @@ export interface TokenInfo {
   chainId?: number;
 }
 
+/**
+ * Quotation result interface
+ */
+export interface QuotationResult {
+  amountOut: string;
+  fee: number;
+  exchangeRate: string;
+  path?: string;
+}
+
 // Optimism chain ID
 const CHAIN_ID = 10;
 
@@ -103,5 +113,70 @@ export async function searchTokens(searchTerm: string): Promise<TokenInfo[]> {
   } catch (error) {
     console.error('Error searching tokens:', error);
     return [];
+  }
+}
+
+/**
+ * Get quotation for token swap from Protocolink
+ * @param params Parameters for the quotation
+ * @returns Quotation result
+ */
+export async function getQuotation(params: {
+  fromToken: TokenInfo;
+  toToken: TokenInfo;
+  amount: string;
+  slippage: number;
+}): Promise<QuotationResult> {
+  try {
+    const { fromToken, toToken, amount, slippage } = params;
+    
+    // Convert tokens to Protocolink format
+    const inputToken = {
+      chainId: CHAIN_ID,
+      address: fromToken.address,
+      decimals: fromToken.decimals,
+      symbol: fromToken.symbol,
+      name: fromToken.name
+    };
+    
+    const outputToken = {
+      chainId: CHAIN_ID,
+      address: toToken.address,
+      decimals: toToken.decimals,
+      symbol: toToken.symbol,
+      name: toToken.name
+    };
+    
+    // Get quotation from Protocolink
+    const quotation = await api.protocols.uniswapv3.getSwapTokenQuotation(CHAIN_ID, {
+      input: {
+        token: inputToken,
+        amount: amount
+      },
+      tokenOut: outputToken,
+      slippage: slippage * 100 // Protocolink uses basis points (1% = 100)
+    });
+    
+    // Calculate exchange rate
+    const inputAmount = parseFloat(amount);
+    const outputAmount = parseFloat(quotation.output.amount);
+    const rate = outputAmount / inputAmount;
+    
+    // Return formatted result
+    return {
+      amountOut: quotation.output.amount,
+      fee: 0.3, // Default fee for Uniswap V3 (can be improved with actual pool data)
+      exchangeRate: `1 ${fromToken.symbol} = ${rate.toFixed(6)} ${toToken.symbol}`,
+      path: '' // Path information not directly available from the API
+    };
+  } catch (error: unknown) {
+    console.error('Error getting quotation from Protocolink:', error);
+    
+    // If API call fails, throw error to be handled by caller
+    if (error instanceof Error) {
+      throw new Error(`Failed to get quotation: ${error.message}`);
+    } else {
+      throw new Error('Failed to get quotation: Unknown error');
+    }
   }
 } 

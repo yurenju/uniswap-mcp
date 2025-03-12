@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import * as protocolink from "./utils/protocolink.js";
+import * as quoting from "./utils/quoting.js";
 
 // Create server instance
 const server = new McpServer({
@@ -148,75 +149,28 @@ Chain: Optimism (Chain ID: 10)
 // Register quote tool
 server.tool(
   "get-quote",
-  "Get a quote for swapping tokens",
+  "Get a quote for buying tokens with USDC",
   {
-    tokenInSymbol: z.string().describe("Input token symbol (e.g., ETH, USDC)"),
-    tokenOutSymbol: z.string().describe("Output token symbol (e.g., USDC, OP)"),
-    amountIn: z.number().positive().describe("Amount of input token"),
-    tokenIn: z.string().optional().describe("Input token address (optional if tokenInSymbol is provided)"),
-    tokenOut: z.string().optional().describe("Output token address (optional if tokenOutSymbol is provided)"),
-    decimalsIn: z.number().optional().describe("Input token decimals (optional, defaults to auto-detect)"),
-    decimalsOut: z.number().optional().describe("Output token decimals (optional, defaults to auto-detect)"),
+    tokenSymbol: z.string().describe("Token symbol you want to buy (e.g., OP, ETH)"),
+    amountIn: z.number().positive().describe("Amount of USDC to spend"),
+    slippage: z.number().optional().default(0.5).describe("Slippage tolerance in percentage (default: 0.5%)"),
   },
-  async ({ tokenInSymbol, tokenOutSymbol, amountIn }) => {
+  async ({ tokenSymbol, amountIn, slippage = 0.5 }) => {
     try {
-      // Convert symbols to uppercase for case-insensitive matching
-      const upperTokenInSymbol = tokenInSymbol.toUpperCase();
-      const upperTokenOutSymbol = tokenOutSymbol.toUpperCase();
+      // Convert symbol to uppercase for case-insensitive matching
+      const upperTokenSymbol = tokenSymbol.toUpperCase();
       
-      // Check if tokens exist in our mock data
-      if (!MOCK_TOKENS[upperTokenInSymbol] || !MOCK_TOKENS[upperTokenOutSymbol]) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `One or both tokens (${tokenInSymbol}, ${tokenOutSymbol}) not found.`,
-            },
-          ],
-        };
-      }
-
-      // Mock price data (in a real implementation, this would come from Uniswap)
-      const mockPrices: Record<string, number> = {
-        "ETH_USDC": 3500,
-        "USDC_ETH": 1 / 3500,
-        "OP_USDC": 2.5,
-        "USDC_OP": 1 / 2.5,
-        "ETH_OP": 3500 / 2.5,
-        "OP_ETH": 2.5 / 3500,
-        "DAI_USDC": 0.99,
-        "USDC_DAI": 1 / 0.99,
-        "ETH_DAI": 3500 * 0.99,
-        "DAI_ETH": 1 / (3500 * 0.99),
-        "OP_DAI": 2.5 * 0.99,
-        "DAI_OP": 1 / (2.5 * 0.99),
-        "WETH_ETH": 1,
-        "ETH_WETH": 1,
-        "WETH_USDC": 3500,
-        "USDC_WETH": 1 / 3500,
-      };
-
-      const pricePair = `${upperTokenInSymbol}_${upperTokenOutSymbol}`;
-      const price = mockPrices[pricePair] || 1; // Default to 1:1 if pair not found
+      // Get quote from Protocolink
+      const quote = await quoting.getQuote(upperTokenSymbol, amountIn.toString(), slippage);
       
-      // Calculate output amount
-      const amountOut = amountIn * price;
-      
-      // Add some mock price impact and fee
-      const priceImpact = 0.5; // 0.5%
-      const fee = 0.3; // 0.3%
-      
-      // Calculate final amount with price impact and fee
-      const finalAmountOut = amountOut * (1 - priceImpact / 100 - fee / 100);
-
       // Format response
       const responseText = `
 Quote Information:
-Input: ${amountIn} ${MOCK_TOKENS[upperTokenInSymbol].symbol}
-Output: ${finalAmountOut.toFixed(6)} ${MOCK_TOKENS[upperTokenOutSymbol].symbol}
-Exchange Rate: 1 ${MOCK_TOKENS[upperTokenInSymbol].symbol} = ${price.toFixed(6)} ${MOCK_TOKENS[upperTokenOutSymbol].symbol}
-Price Impact: ${priceImpact}%
-Fee: ${fee}%
+Buy: ${quote.tokenOut.symbol}
+Spend: ${amountIn} USDC
+Receive: ${quote.amountOut} ${quote.tokenOut.symbol}
+Exchange Rate: ${quote.exchangeRate}
+Fee: ${quote.fee}%
       `.trim();
 
       return {
@@ -234,6 +188,54 @@ Fee: ${fee}%
           {
             type: "text",
             text: "Failed to retrieve quote. Please try again.",
+          },
+        ],
+      };
+    }
+  }
+);
+
+// Register sell quote tool
+server.tool(
+  "sell-quote",
+  "Get a quote for selling tokens for USDC",
+  {
+    tokenSymbol: z.string().describe("Token symbol you want to sell (e.g., OP, ETH)"),
+    amountIn: z.number().positive().describe("Amount of token to sell"),
+    slippage: z.number().optional().default(0.5).describe("Slippage tolerance in percentage (default: 0.5%)"),
+  },
+  async ({ tokenSymbol, amountIn, slippage = 0.5 }) => {
+    try {
+      // Convert symbol to uppercase for case-insensitive matching
+      const upperTokenSymbol = tokenSymbol.toUpperCase();
+      
+      // Get sell quote from Protocolink
+      const quote = await quoting.getSellQuote(upperTokenSymbol, amountIn.toString(), slippage);
+      
+      // Format response
+      const responseText = `
+Sell Quote Information:
+Sell: ${amountIn} ${quote.tokenIn.symbol}
+Receive: ${quote.amountOut} USDC
+Exchange Rate: ${quote.exchangeRate}
+Fee: ${quote.fee}%
+      `.trim();
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: responseText,
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Error in sell-quote:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Failed to retrieve sell quote. Please try again.",
           },
         ],
       };
@@ -261,8 +263,11 @@ server.tool(
       const upperTokenInSymbol = tokenInSymbol.toUpperCase();
       const upperTokenOutSymbol = tokenOutSymbol.toUpperCase();
       
-      // Check if tokens exist in our mock data
-      if (!MOCK_TOKENS[upperTokenInSymbol] || !MOCK_TOKENS[upperTokenOutSymbol]) {
+      // Get token information
+      const tokenIn = await getTokenInfo(upperTokenInSymbol);
+      const tokenOut = await getTokenInfo(upperTokenOutSymbol);
+      
+      if (!tokenIn || !tokenOut) {
         return {
           content: [
             {
@@ -272,41 +277,28 @@ server.tool(
           ],
         };
       }
-
-      // Mock price data (same as in get-quote)
-      const mockPrices: Record<string, number> = {
-        "ETH_USDC": 3500,
-        "USDC_ETH": 1 / 3500,
-        "OP_USDC": 2.5,
-        "USDC_OP": 1 / 2.5,
-        "ETH_OP": 3500 / 2.5,
-        "OP_ETH": 2.5 / 3500,
-        "DAI_USDC": 0.99,
-        "USDC_DAI": 1 / 0.99,
-        "ETH_DAI": 3500 * 0.99,
-        "DAI_ETH": 1 / (3500 * 0.99),
-        "OP_DAI": 2.5 * 0.99,
-        "DAI_OP": 1 / (2.5 * 0.99),
-        "WETH_ETH": 1,
-        "ETH_WETH": 1,
-        "WETH_USDC": 3500,
-        "USDC_WETH": 1 / 3500,
-      };
-
-      const pricePair = `${upperTokenInSymbol}_${upperTokenOutSymbol}`;
-      const price = mockPrices[pricePair] || 1; // Default to 1:1 if pair not found
       
-      // Calculate output amount
-      const amountOut = amountIn * price;
+      // Get quote for the swap
+      let quote;
+      if (upperTokenInSymbol === 'USDC') {
+        // Buying tokens with USDC
+        quote = await quoting.getQuote(upperTokenOutSymbol, amountIn.toString(), slippageTolerance);
+      } else if (upperTokenOutSymbol === 'USDC') {
+        // Selling tokens for USDC
+        quote = await quoting.getSellQuote(upperTokenInSymbol, amountIn.toString(), slippageTolerance);
+      } else {
+        // Custom token pair (not implemented yet)
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Custom token pairs are not supported yet. Please use USDC as either the input or output token.",
+            },
+          ],
+        };
+      }
       
-      // Add some mock price impact and fee
-      const priceImpact = 0.5; // 0.5%
-      const fee = 0.3; // 0.3%
-      
-      // Calculate final amount with price impact and fee
-      const finalAmountOut = amountOut * (1 - priceImpact / 100 - fee / 100);
-
-      // Generate a mock transaction hash
+      // Generate a mock transaction hash (in a real implementation, this would be a real transaction hash)
       const mockTxHash = "0x" + Array.from({ length: 64 }, () => 
         Math.floor(Math.random() * 16).toString(16)).join('');
 
@@ -315,12 +307,11 @@ server.tool(
 Swap Executed Successfully!
 
 Transaction Details:
-Input: ${amountIn} ${MOCK_TOKENS[upperTokenInSymbol].symbol}
-Output: ${finalAmountOut.toFixed(6)} ${MOCK_TOKENS[upperTokenOutSymbol].symbol}
-Exchange Rate: 1 ${MOCK_TOKENS[upperTokenInSymbol].symbol} = ${price.toFixed(6)} ${MOCK_TOKENS[upperTokenOutSymbol].symbol}
+Input: ${amountIn} ${tokenIn.symbol}
+Output: ${quote.amountOut} ${tokenOut.symbol}
+Exchange Rate: ${quote.exchangeRate}
 Slippage Tolerance: ${slippageTolerance}%
-Price Impact: ${priceImpact}%
-Fee: ${fee}%
+Fee: ${quote.fee}%
 Transaction Hash: ${mockTxHash}
 Network: Optimism
 

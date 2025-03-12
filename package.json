@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
-    "token-info": "tsx scripts/token-info.ts"
+    "token-info": "tsx scripts/token-info.ts",
+    "quote-info": "tsx scripts/quote-info.ts"
   },
   "files": [
     "build"
