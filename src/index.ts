@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import * as protocolink from "./utils/protocolink.js";
 import * as quoting from "./utils/quoting.js";
+import * as swapping from "./utils/swapping.js";
 
 // Create server instance
 const server = new McpServer({
@@ -251,13 +252,10 @@ server.tool(
     tokenInSymbol: z.string().describe("Input token symbol (e.g., ETH, USDC)"),
     tokenOutSymbol: z.string().describe("Output token symbol (e.g., USDC, OP)"),
     amountIn: z.number().positive().describe("Amount of input token"),
-    tokenIn: z.string().optional().describe("Input token address (optional if tokenInSymbol is provided)"),
-    tokenOut: z.string().optional().describe("Output token address (optional if tokenOutSymbol is provided)"),
     slippageTolerance: z.number().optional().default(0.5).describe("Slippage tolerance in percentage (default: 0.5%)"),
     recipient: z.string().optional().describe("Recipient address (optional, defaults to sender)"),
-    deadline: z.number().optional().describe("Transaction deadline in minutes (optional, defaults to 20 minutes)"),
   },
-  async ({ tokenInSymbol, tokenOutSymbol, amountIn, slippageTolerance = 0.5 }) => {
+  async ({ tokenInSymbol, tokenOutSymbol, amountIn, slippageTolerance = 0.5, recipient }) => {
     try {
       // Convert symbols to uppercase for case-insensitive matching
       const upperTokenInSymbol = tokenInSymbol.toUpperCase();
@@ -278,44 +276,27 @@ server.tool(
         };
       }
       
-      // Get quote for the swap
-      let quote;
-      if (upperTokenInSymbol === 'USDC') {
-        // Buying tokens with USDC
-        quote = await quoting.getQuote(upperTokenOutSymbol, amountIn.toString(), slippageTolerance);
-      } else if (upperTokenOutSymbol === 'USDC') {
-        // Selling tokens for USDC
-        quote = await quoting.getSellQuote(upperTokenInSymbol, amountIn.toString(), slippageTolerance);
-      } else {
-        // Custom token pair (not implemented yet)
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Custom token pairs are not supported yet. Please use USDC as either the input or output token.",
-            },
-          ],
-        };
-      }
+      // Execute the actual swap
+      const swapResult = await swapping.swapTokens({
+        fromTokenSymbol: upperTokenInSymbol,
+        toTokenSymbol: upperTokenOutSymbol,
+        amount: amountIn.toString(),
+        slippage: slippageTolerance,
+        recipient
+      });
       
-      // Generate a mock transaction hash (in a real implementation, this would be a real transaction hash)
-      const mockTxHash = "0x" + Array.from({ length: 64 }, () => 
-        Math.floor(Math.random() * 16).toString(16)).join('');
-
       // Format response
       const responseText = `
 Swap Executed Successfully!
 
 Transaction Details:
-Input: ${amountIn} ${tokenIn.symbol}
-Output: ${quote.amountOut} ${tokenOut.symbol}
-Exchange Rate: ${quote.exchangeRate}
+Input: ${swapResult.fromToken.amount} ${swapResult.fromToken.symbol}
+Output: ${swapResult.toToken.amount} ${swapResult.toToken.symbol}
+Exchange Rate: ${swapResult.exchangeRate}
 Slippage Tolerance: ${slippageTolerance}%
-Fee: ${quote.fee}%
-Transaction Hash: ${mockTxHash}
+Fee: ${swapResult.fee}%
+Transaction Hash: ${swapResult.transactionHash}
 Network: Optimism
-
-Note: This is a mock transaction. In a real implementation, this would execute an actual swap on Uniswap.
       `.trim();
 
       return {

@@ -20,8 +20,8 @@ export const DEFAULT_RECIPIENT_ADDRESS = ''; // Empty string means use the walle
  */
 export interface WalletConfig {
   privateKey: string;
-  publicClient: ReturnType<typeof createPublicClient>;
-  walletClient: ReturnType<typeof createWalletClient>;
+  publicClient: any; // Using any to avoid type conflicts
+  walletClient: any; // Using any to avoid type conflicts
   address: string;
 }
 
