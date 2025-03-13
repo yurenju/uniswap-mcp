@@ -28,9 +28,9 @@ npm run generate-wallet
    - Refer to `.env.example` for the required environment variables format
    - Add your Moralis API key to the generated `.env` file
 
-4. Fund your wallet for testing:
-   - Transfer 0.01 ETH to your generated wallet address (for gas fees)
-   - Transfer 20 USDC to your generated wallet address (for swap testing)
+4. Fund your wallet for testing (on Optimism network):
+   - Transfer 0.01 ETH to your generated wallet address on Optimism (for gas fees)
+   - Transfer 20 USDC to your generated wallet address on Optimism (for swap testing)
    - You can check your wallet balance using `npm run get-wallet-info`
 
 ## Environment Variables
