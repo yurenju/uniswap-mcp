@@ -5,7 +5,10 @@
  * WARNING: This is for testing purposes only. Do not use for production.
  * 
  * Usage:
- * npm run generate-wallet
+ * npm run generate-wallet [--force]
+ * 
+ * Options:
+ * --force    Force overwrite if WALLET_PRIVATE_KEY already exists in .env
  */
 
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
@@ -15,6 +18,9 @@ import path from 'path';
 
 async function main() {
   try {
+    // Check if --force flag is present
+    const forceOverwrite = process.argv.includes('--force');
+    
     console.log('Generating a new random wallet for testing...');
     console.log('WARNING: This is for testing purposes only. Do not use for production.');
     console.log('------------------------------------------------------');
@@ -41,6 +47,13 @@ async function main() {
       
       // Check if WALLET_PRIVATE_KEY already exists
       if (envContent.includes('WALLET_PRIVATE_KEY=')) {
+        if (!forceOverwrite) {
+          console.log('\n------------------------------------------------------');
+          console.log('Error: WALLET_PRIVATE_KEY already exists in .env file.');
+          console.log('To overwrite the existing private key, use the --force flag:');
+          console.log('npm run generate-wallet -- --force');
+          process.exit(1);
+        }
         // Replace existing WALLET_PRIVATE_KEY
         envContent = envContent.replace(
           /WALLET_PRIVATE_KEY=.*/,

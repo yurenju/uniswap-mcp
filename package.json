@@ -5,10 +5,12 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "postbuild": "copyfiles -u 0 .env build/",
     "token-info": "tsx scripts/token-info.ts",
     "wallet-info": "tsx scripts/get-wallet-info.ts",
     "quote-info": "tsx scripts/quote-info.ts",
-    "swap-test": "tsx scripts/swap-test.ts"
+    "swap-test": "tsx scripts/swap-test.ts",
+    "generate-wallet": "tsx scripts/generate-wallet.ts"
   },
   "files": [
     "build"
@@ -33,6 +35,7 @@
   },
   "devDependencies": {
     "@types/node": "22.13.9",
+    "copyfiles": "^2.4.1",
     "tsx": "^4.7.1",
     "typescript": "5.8.2"
   }
